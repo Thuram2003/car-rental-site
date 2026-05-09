@@ -1,26 +1,233 @@
 @import "tailwindcss";
 
+/* ============================================
+   CENTRALIZED COLOR SYSTEM
+   Change these 4 variables to update entire theme
+
+   THEME: DriveGo Orange
+   ============================================ */
+
 :root {
+  /* Brand Colors — CHANGE THESE TO UPDATE ENTIRE THEME */
+  --primary: #ea580c;        /* Orange 600 */
+  --primary-light: #ffedd5;  /* Orange 100 */
+  --primary-lighter: #fff7ed; /* Orange 50 */
+  --primary-dark: #c2410c;   /* Orange 700 */
+
+  /* Semantic Colors */
+  --success: #22c55e;
+  --success-light: #dcfce7;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --danger: #ef4444;
+  --danger-light: #fee2e2;
+  --info: #3b82f6;
+  --info-light: #dbeafe;
+
+  /* Neutral Scale */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+
+  /* Background Colors */
+  --page-bg: #f8fafc;
+  --card-bg: #ffffff;
+  --sidebar-bg: #111827;
+
+  /* Text Colors */
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+
+  /* Border Colors */
+  --border-light: #e5e7eb;
+  --border-default: #d1d5db;
+
+  /* Legacy */
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #111827;
 }
+
+/* ============================================
+   TAILWIND THEME CONFIGURATION
+   ============================================ */
 
 @theme inline {
+  /* Core */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Brand */
+  --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-primary-lighter: var(--primary-lighter);
+  --color-primary-dark: var(--primary-dark);
+
+  /* Semantic */
+  --color-success: var(--success);
+  --color-success-light: var(--success-light);
+  --color-warning: var(--warning);
+  --color-warning-light: var(--warning-light);
+  --color-danger: var(--danger);
+  --color-danger-light: var(--danger-light);
+  --color-info: var(--info);
+  --color-info-light: var(--info-light);
+
+  /* Grays */
+  --color-gray-50: var(--gray-50);
+  --color-gray-100: var(--gray-100);
+  --color-gray-200: var(--gray-200);
+  --color-gray-300: var(--gray-300);
+  --color-gray-400: var(--gray-400);
+  --color-gray-500: var(--gray-500);
+  --color-gray-600: var(--gray-600);
+  --color-gray-700: var(--gray-700);
+  --color-gray-800: var(--gray-800);
+  --color-gray-900: var(--gray-900);
+
+  /* Component-specific */
+  --color-page-bg: var(--page-bg);
+  --color-card-bg: var(--card-bg);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-border-light: var(--border-light);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+body {
+  background: var(--page-bg);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+@layer utilities {
+  .bg-page {
+    background-color: var(--page-bg);
+  }
+
+  .bg-card {
+    background-color: var(--card-bg);
+  }
+
+  .auth-gradient {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  }
+
+  /* Animations */
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slide-in-from-bottom {
+    from { transform: translateY(8px); }
+    to   { transform: translateY(0); }
+  }
+
+  @keyframes scale-pulse {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.05); }
+  }
+
+  .animate-in {
+    animation-fill-mode: both;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out;
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.6s ease-out both;
+  }
+
+  .animate-scale-pulse {
+    animation: scale-pulse 2s ease-in-out infinite;
+  }
+
+  .duration-300 {
+    animation-duration: 300ms;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ============================================
+   COMPONENT STYLES
+   ============================================ */
+
+@layer components {
+  /* Status Badges */
+  .badge-success {
+    @apply px-2.5 py-0.5 rounded-full text-xs font-medium;
+    background-color: var(--success-light);
+    color: var(--success);
+  }
+
+  .badge-warning {
+    @apply px-2.5 py-0.5 rounded-full text-xs font-medium;
+    background-color: var(--warning-light);
+    color: var(--warning);
+  }
+
+  .badge-danger {
+    @apply px-2.5 py-0.5 rounded-full text-xs font-medium;
+    background-color: var(--danger-light);
+    color: var(--danger);
+  }
+}
+
+/* ============================================
+   SONNER TOAST STYLES
+   ============================================ */
+
+[data-sonner-toaster] {
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+[data-sonner-toast] {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  padding: 1rem !important;
+  min-height: 3.5rem !important;
+}
+
+[data-sonner-toast][data-type="success"] { border-left: 3px solid var(--success) !important; }
+[data-sonner-toast][data-type="error"]   { border-left: 3px solid var(--danger) !important; }
+[data-sonner-toast][data-type="warning"] { border-left: 3px solid var(--warning) !important; }
+[data-sonner-toast][data-type="info"]    { border-left: 3px solid var(--info) !important; }
+
+[data-sonner-toast] [data-title] {
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+}
+
+[data-sonner-toast] [data-description] {
+  font-size: 0.8125rem !important;
+  color: var(--text-secondary) !important;
 }
