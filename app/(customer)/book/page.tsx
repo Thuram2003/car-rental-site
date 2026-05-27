@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
-  CaretLeft, CaretRight, Car, MapPin, CreditCard, Check, ShieldCheck, Users, GasPump,
+  CaretLeft, CaretRight, Car, MapPin, Check, ShieldCheck, Users, GasPump, CircleNotch,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,55 +13,129 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { MOCK_VEHICLES } from "@/lib/mock-data";
+import { toast } from "sonner";
+import { getVehicleById } from "@/lib/actions/vehicles";
+import { createBooking } from "@/lib/actions/bookings";
 import { formatCurrency, calculateDays } from "@/lib/utils";
+import type { VehicleWithRating } from "@/lib/supabase/types";
 
 const STEPS = ["Select Dates", "Review", "Payment", "Confirmed"];
+const SERVICE_FEE = 5000;
 
-const CAR = MOCK_VEHICLES[0];
 const LOCATIONS = [
-  { value: "downtown", label: "Downtown Branch" },
+  { value: "douala", label: "Douala Branch" },
   { value: "airport", label: "Airport Branch" },
-  { value: "mall", label: "Mall Branch" },
+  { value: "yaounde", label: "Yaoundé Branch" },
 ];
 
-export default function BookPage() {
+// ─── Inner component (uses useSearchParams) ───────────────────────────────────
+
+function BookPageInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const carId = searchParams.get("carId");
+  const urlStartDate = searchParams.get("startDate");
+  const urlEndDate = searchParams.get("endDate");
+
+  const [car, setCar] = useState<VehicleWithRating | null>(null);
+  const [loadingCar, setLoadingCar] = useState(true);
   const [step, setStep] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [bookingRef, setBookingRef] = useState<string | null>(null);
+
   const [form, setForm] = useState({
-    startDate: "",
-    endDate: "",
-    pickupLocation: "downtown",
-    dropoffLocation: "downtown",
+    startDate: urlStartDate || "",
+    endDate: urlEndDate || "",
+    pickupLocation: "douala",
+    dropoffLocation: "douala",
     cardNumber: "",
     cardName: "",
     expiry: "",
     cvv: "",
   });
 
+  // Fetch vehicle on mount
+  useEffect(() => {
+    if (!carId) {
+      setLoadingCar(false);
+      return;
+    }
+    getVehicleById(carId).then((data) => {
+      setCar(data);
+      setLoadingCar(false);
+    });
+  }, [carId]);
+
   const days =
     form.startDate && form.endDate
       ? calculateDays(new Date(form.startDate), new Date(form.endDate))
       : 0;
 
-  const subtotal = days * CAR.dailyRate;
-  const serviceFee = 15;
-  const total = subtotal + serviceFee;
+  const subtotal = car ? days * car.daily_rate : 0;
+  const total = subtotal + SERVICE_FEE;
 
   const handleNext = async () => {
     if (step === 2) {
-      setLoading(true);
-      await new Promise((r) => setTimeout(r, 1500));
-      setLoading(false);
+      // Submit booking to Supabase
+      if (!car) return;
+      setSubmitting(true);
+
+      const { id, error } = await createBooking({
+        vehicleId: car.id,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        dailyRate: car.daily_rate,
+        subtotal,
+        totalAmount: total,
+      });
+
+      setSubmitting(false);
+
+      if (error) {
+        if (error.includes("signed in")) {
+          toast.error("Please sign in to complete your booking.");
+          router.push(`/login?redirectTo=/book?carId=${car.id}`);
+          return;
+        }
+        toast.error("Booking failed", { description: error });
+        return;
+      }
+
+      setBookingRef(id);
     }
     setStep((s) => Math.min(s + 1, 3));
   };
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+  if (loadingCar) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <CircleNotch className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // ── No car found ───────────────────────────────────────────────────────────
+  if (!car) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-20 text-center">
+        <Car className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-gray-900 mb-2">No vehicle selected</h2>
+        <p className="text-gray-500 text-sm mb-6">
+          Please choose a car from our fleet first.
+        </p>
+        <Link href="/cars">
+          <Button variant="default">Browse Cars</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back */}
       <Link
-        href={`/cars/${CAR.id}`}
+        href={`/cars/${car.id}`}
         className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary mb-6 transition-colors"
       >
         <CaretLeft className="w-4 h-4" />
@@ -103,8 +178,9 @@ export default function BookPage() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main content */}
+        {/* ── Main content ── */}
         <div className="lg:col-span-2">
+
           {/* Step 0 — Select Dates */}
           {step === 0 && (
             <Card className="border-gray-100">
@@ -147,9 +223,7 @@ export default function BookPage() {
                     value={form.pickupLocation}
                     onValueChange={(v) => setForm({ ...form, pickupLocation: v })}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {LOCATIONS.map((l) => (
                         <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
@@ -164,9 +238,7 @@ export default function BookPage() {
                     value={form.dropoffLocation}
                     onValueChange={(v) => setForm({ ...form, dropoffLocation: v })}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {LOCATIONS.map((l) => (
                         <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
@@ -197,14 +269,20 @@ export default function BookPage() {
 
                 <div className="flex gap-4 p-4 bg-gray-50 rounded-sm">
                   <div className="relative w-24 h-20 rounded-sm overflow-hidden shrink-0">
-                    <Image src={CAR.imageUrl} alt={`${CAR.make} ${CAR.model}`} fill className="object-cover" unoptimized />
+                    <Image
+                      src={car.image_url ?? "/placeholder-car.jpg"}
+                      alt={`${car.make} ${car.model}`}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900">{CAR.make} {CAR.model}</p>
-                    <p className="text-sm text-gray-500">{CAR.year} · {CAR.category}</p>
+                    <p className="font-semibold text-gray-900">{car.make} {car.model}</p>
+                    <p className="text-sm text-gray-500">{car.year} · {car.category}</p>
                     <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                      <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{CAR.seats} seats</span>
-                      <span className="flex items-center gap-1"><GasPump className="w-3.5 h-3.5" />{CAR.fuelType}</span>
+                      <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{car.seats} seats</span>
+                      <span className="flex items-center gap-1"><GasPump className="w-3.5 h-3.5" />{car.fuel_type}</span>
                     </div>
                   </div>
                 </div>
@@ -287,15 +365,21 @@ export default function BookPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(1)}>Back</Button>
+                  <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(1)} disabled={submitting}>
+                    Back
+                  </Button>
                   <Button
                     variant="default"
                     size="lg"
                     className="flex-1"
                     onClick={handleNext}
-                    disabled={loading}
+                    disabled={submitting}
                   >
-                    {loading ? "Processing..." : `Pay ${formatCurrency(total)}`}
+                    {submitting ? (
+                      <><CircleNotch className="w-4 h-4 animate-spin" /> Processing...</>
+                    ) : (
+                      `Pay ${formatCurrency(total)}`
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -311,13 +395,17 @@ export default function BookPage() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Booking Confirmed!</h2>
-                  <p className="text-gray-500 mt-2">
-                    Your booking reference is{" "}
-                    <span className="font-bold text-primary">#DG-2026-0042</span>
-                  </p>
+                  {bookingRef && (
+                    <p className="text-gray-500 mt-2">
+                      Your booking reference is{" "}
+                      <span className="font-bold text-primary font-mono">
+                        #{bookingRef.toUpperCase().slice(0, 8)}
+                      </span>
+                    </p>
+                  )}
                 </div>
                 <p className="text-sm text-gray-500">
-                  A confirmation email has been sent to your registered email address.
+                  You can track your booking status in My Bookings.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Link href="/bookings">
@@ -332,7 +420,7 @@ export default function BookPage() {
           )}
         </div>
 
-        {/* Order summary sidebar */}
+        {/* ── Order summary sidebar ── */}
         {step < 3 && (
           <div className="space-y-4">
             <Card className="border-gray-100">
@@ -340,16 +428,26 @@ export default function BookPage() {
                 <h3 className="font-semibold text-gray-900 mb-4 text-sm">Order Summary</h3>
 
                 <div className="relative h-32 rounded-sm overflow-hidden mb-4">
-                  <Image src={CAR.imageUrl} alt={`${CAR.make} ${CAR.model}`} fill className="object-cover" unoptimized />
+                  <Image
+                    src={car.image_url ?? "/placeholder-car.jpg"}
+                    alt={`${car.make} ${car.model}`}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
                 </div>
 
-                <p className="font-semibold text-gray-900 text-sm">{CAR.make} {CAR.model}</p>
-                <p className="text-xs text-gray-500 mb-4">{CAR.year} · {CAR.category}</p>
+                <p className="font-semibold text-gray-900 text-sm">{car.make} {car.model}</p>
+                <p className="text-xs text-gray-500 mb-4">{car.year} · {car.category}</p>
 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">{formatCurrency(CAR.dailyRate)} × {days || "—"} days</span>
-                    <span className="text-gray-700 font-medium">{days ? formatCurrency(subtotal) : "—"}</span>
+                    <span className="text-gray-500">
+                      {formatCurrency(car.daily_rate)} × {days || "—"} days
+                    </span>
+                    <span className="text-gray-700 font-medium">
+                      {days ? formatCurrency(subtotal) : "—"}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Insurance</span>
@@ -357,11 +455,13 @@ export default function BookPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Service fee</span>
-                    <span className="text-gray-700 font-medium">{formatCurrency(serviceFee)}</span>
+                    <span className="text-gray-700 font-medium">{formatCurrency(SERVICE_FEE)}</span>
                   </div>
                   <div className="border-t border-gray-100 pt-2 flex justify-between">
                     <span className="font-semibold text-gray-900">Total</span>
-                    <span className="font-bold text-primary text-lg">{days ? formatCurrency(total) : "—"}</span>
+                    <span className="font-bold text-primary text-lg">
+                      {days ? formatCurrency(total) : "—"}
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -379,5 +479,19 @@ export default function BookPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Page export (wraps in Suspense for useSearchParams) ──────────────────────
+
+export default function BookPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <CircleNotch className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    }>
+      <BookPageInner />
+    </Suspense>
   );
 }

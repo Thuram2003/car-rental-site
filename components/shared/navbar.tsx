@@ -1,21 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
-  Car, List, X, User, SignOut, LayoutDashboard, CaretDown,
+  Car, List, X, User, SignOut, Gauge, CaretDown,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-// Mock auth state — will be replaced with Supabase
-const MOCK_USER = null as { name: string; role: string } | null;
+import { createClient } from "@/lib/supabase/client";
+import type { Profile } from "@/lib/supabase/types";
+import { toast } from "sonner";
+import { signOutAction } from "@/lib/actions/auth";
 
 const navLinks = [
   { href: "/cars", label: "Browse Cars" },
@@ -23,10 +24,58 @@ const navLinks = [
   { href: "/contact", label: "Contact" },
 ];
 
-export function Navbar() {
+interface NavbarProps {
+  initialProfile?: Profile | null;
+}
+
+export function Navbar({ initialProfile = null }: NavbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const user = MOCK_USER;
+  const [profile, setProfile] = useState<Profile | null>(initialProfile);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    // Listen for auth changes only (no initial fetch since we have server data)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event) => {
+        console.log("Auth state changed:", event);
+        
+        // On sign out, clear profile
+        if (event === "SIGNED_OUT") {
+          setProfile(null);
+        } 
+        // On sign in or token refresh, refresh the page to get new server data
+        else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          router.refresh();
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [router]);
+
+  const handleSignOut = async () => {
+    try {
+      const res = await signOutAction();
+      if (res?.error) {
+        toast.error("Failed to sign out", { description: res.error.message });
+        return;
+      }
+      setProfile(null);
+      toast.success("Signed out successfully");
+      router.push("/");
+      router.refresh();
+    } catch (error) {
+      console.error("Sign out error:", error);
+      toast.error("Failed to sign out");
+    }
+  };
+
+  const user = profile;
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
@@ -67,11 +116,12 @@ export function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 px-3 py-2 rounded-sm hover:bg-gray-50 transition-colors">
                     <Avatar className="w-8 h-8">
+                      <AvatarImage src={user.avatar_url || undefined} alt={user.full_name} className="object-cover" />
                       <AvatarFallback className="bg-primary-light text-primary text-sm font-bold">
-                        {user.name.charAt(0)}
+                        {user.full_name.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-sm font-medium text-gray-700">{user.name}</span>
+                    <span className="text-sm font-medium text-gray-700">{user.full_name}</span>
                     <CaretDown className="w-4 h-4 text-gray-400" />
                   </button>
                 </DropdownMenuTrigger>
@@ -91,13 +141,16 @@ export function Navbar() {
                   {user.role === "admin" && (
                     <DropdownMenuItem asChild>
                       <Link href="/admin/dashboard" className="flex items-center gap-2 cursor-pointer">
-                        <LayoutDashboard className="w-4 h-4" />
+                        <Gauge className="w-4 h-4" />
                         Admin Panel
                       </Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" className="flex items-center gap-2 cursor-pointer">
+                  <DropdownMenuItem
+                    className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600"
+                    onClick={handleSignOut}
+                  >
                     <SignOut className="w-4 h-4" />
                     Sign Out
                   </DropdownMenuItem>
@@ -146,10 +199,46 @@ export function Navbar() {
           <div className="pt-3 flex flex-col gap-2">
             {user ? (
               <>
-                <Link href="/bookings" onClick={() => setMobileOpen(false)}>
-                  <Button variant="outline" size="default" className="w-full">My Bookings</Button>
+                <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-100 mb-2">
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src={user.avatar_url || undefined} alt={user.full_name} className="object-cover" />
+                    <AvatarFallback className="bg-primary-light text-primary text-sm font-bold">
+                      {user.full_name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-gray-900 leading-none">{user.full_name}</p>
+                    <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">{user.role}</p>
+                  </div>
+                </div>
+                <Link href="/profile" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" size="default" className="w-full justify-start gap-2">
+                    <User className="w-4 h-4" />
+                    Profile
+                  </Button>
                 </Link>
-                <Button variant="destructive" size="default" className="w-full">Sign Out</Button>
+                {user.role === "admin" && (
+                  <Link href="/admin/dashboard" onClick={() => setMobileOpen(false)}>
+                    <Button variant="outline" size="default" className="w-full justify-start gap-2">
+                      <Gauge className="w-4 h-4" />
+                      Admin Panel
+                    </Button>
+                  </Link>
+                )}
+                <Link href="/bookings" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" size="default" className="w-full justify-start gap-2">
+                    <Car className="w-4 h-4" />
+                    My Bookings
+                  </Button>
+                </Link>
+                <Button
+                  variant="destructive"
+                  size="default"
+                  className="w-full"
+                  onClick={handleSignOut}
+                >
+                  Sign Out
+                </Button>
               </>
             ) : (
               <>

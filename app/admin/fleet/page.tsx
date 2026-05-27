@@ -1,50 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Plus, MagnifyingGlass, PencilSimple, Trash } from "@phosphor-icons/react";
+import { Plus, MagnifyingGlass, PencilSimple, Trash, Spinner } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import {
   Table, TableHeader, TableBody, TableHead, TableRow, TableCell,
 } from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { MOCK_VEHICLES, type Vehicle } from "@/lib/mock-data";
+import { toast } from "sonner";
+import { getAllVehiclesAdmin, deactivateVehicle } from "@/lib/actions/vehicles";
 import { formatCurrency } from "@/lib/utils";
+import { AddVehicleDrawer } from "@/components/cars";
 
-const addVehicleSchema = z.object({
-  make: z.string().min(1, "Make is required"),
-  model: z.string().min(1, "Model is required"),
-  year: z.string().min(4, "Year is required"),
-  color: z.string().min(1, "Color is required"),
-  dailyRate: z.string().min(1, "Daily rate is required"),
-  seats: z.string().min(1, "Seats is required"),
-  vin: z.string().min(5, "VIN is required"),
-});
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-type AddVehicleValues = z.infer<typeof addVehicleSchema>;
+type DbVehicle = {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  category: string;
+  color: string;
+  license_plate: string;
+  daily_rate: number;
+  status: string;
+  image_url: string | null;
+  cloudinary_public_id: string | null;
+  is_active: boolean;
+  branches?: { name: string } | null;
+};
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FleetPage() {
+  const [vehicles, setVehicles] = useState<DbVehicle[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [showAddDialog, setShowAddDialog] = useState(false);
 
-  const filtered = MOCK_VEHICLES.filter((v) => {
+  const load = useCallback(async () => {
+    setLoading(true);
+    const data = await getAllVehiclesAdmin();
+    setVehicles(data as DbVehicle[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = vehicles.filter((v) => {
     const matchSearch =
       !search || `${v.make} ${v.model}`.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "All" || v.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  const handleDeactivate = async (id: string) => {
+    const ok = await deactivateVehicle(id);
+    if (ok) {
+      toast.success("Vehicle removed from fleet");
+      load();
+    } else {
+      toast.error("Failed to remove vehicle");
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -52,7 +73,7 @@ export default function FleetPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Fleet Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{MOCK_VEHICLES.length} vehicles total</p>
+          <p className="text-sm text-gray-500 mt-0.5">{vehicles.length} vehicles total</p>
         </div>
         <Button variant="default" size="sm" onClick={() => setShowAddDialog(true)}>
           <Plus className="w-4 h-4" />
@@ -89,50 +110,77 @@ export default function FleetPage() {
       </div>
 
       {/* Table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Vehicle</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Daily Rate</TableHead>
-            <TableHead>Location</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Rating</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filtered.map((vehicle) => (
-            <VehicleRow key={vehicle.id} vehicle={vehicle} />
-          ))}
-        </TableBody>
-      </Table>
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Spinner className="w-6 h-6 text-primary animate-spin" />
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vehicle</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Daily Rate</TableHead>
+              <TableHead>Location</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((vehicle) => (
+              <VehicleRow
+                key={vehicle.id}
+                vehicle={vehicle}
+                onDeactivate={() => handleDeactivate(vehicle.id)}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
-      {filtered.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="text-center py-12 bg-white rounded-sm border border-gray-100">
           <p className="text-gray-400 text-sm">No vehicles found</p>
         </div>
       )}
 
-      {/* Add Vehicle Dialog */}
-      <AddVehicleDialog open={showAddDialog} onClose={() => setShowAddDialog(false)} />
+      {/* Add Vehicle Drawer */}
+      <AddVehicleDrawer
+        open={showAddDialog}
+        onClose={() => setShowAddDialog(false)}
+        onSuccess={() => { setShowAddDialog(false); load(); }}
+      />
     </div>
   );
 }
 
-function VehicleRow({ vehicle }: { vehicle: Vehicle }) {
+// ─── Vehicle Row ──────────────────────────────────────────────────────────────
+
+function VehicleRow({
+  vehicle,
+  onDeactivate,
+}: {
+  vehicle: DbVehicle;
+  onDeactivate: () => void;
+}) {
   return (
     <TableRow>
       <TableCell>
         <div className="flex items-center gap-3">
-          <div className="relative w-14 h-10 rounded-sm overflow-hidden shrink-0">
-            <Image
-              src={vehicle.imageUrl}
-              alt={`${vehicle.make} ${vehicle.model}`}
-              fill
-              className="object-cover"
-              unoptimized
-            />
+          <div className="relative w-14 h-10 rounded-sm overflow-hidden shrink-0 bg-gray-100">
+            {vehicle.image_url ? (
+              <Image
+                src={vehicle.image_url}
+                alt={`${vehicle.make} ${vehicle.model}`}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">
+                No img
+              </div>
+            )}
           </div>
           <div>
             <p className="font-semibold text-gray-900">{vehicle.make} {vehicle.model}</p>
@@ -142,145 +190,23 @@ function VehicleRow({ vehicle }: { vehicle: Vehicle }) {
       </TableCell>
       <TableCell>{vehicle.category}</TableCell>
       <TableCell>
-        <span className="font-semibold text-gray-900">{formatCurrency(vehicle.dailyRate)}</span>
+        <span className="font-semibold text-gray-900">{formatCurrency(vehicle.daily_rate)}</span>
         <span className="text-xs text-gray-400">/day</span>
       </TableCell>
-      <TableCell>{vehicle.location}</TableCell>
+      <TableCell>{vehicle.branches?.name ?? "—"}</TableCell>
       <TableCell>
         <StatusBadge status={vehicle.status} />
-      </TableCell>
-      <TableCell>
-        <span className="text-sm font-semibold text-gray-800">⭐ {vehicle.rating}</span>
-        <span className="text-xs text-gray-400 ml-1">({vehicle.reviewCount})</span>
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5">
           <Button variant="ghost" size="icon-xs">
             <PencilSimple className="w-3.5 h-3.5 text-gray-400" />
           </Button>
-          <Button variant="ghost" size="icon-xs">
+          <Button variant="ghost" size="icon-xs" onClick={onDeactivate}>
             <Trash className="w-3.5 h-3.5 text-gray-400" />
           </Button>
         </div>
       </TableCell>
     </TableRow>
-  );
-}
-
-function AddVehicleDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const form = useForm<AddVehicleValues>({
-    resolver: zodResolver(addVehicleSchema),
-    defaultValues: { make: "", model: "", year: "", color: "", dailyRate: "", seats: "", vin: "" },
-  });
-
-  const onSubmit = (values: AddVehicleValues) => {
-    console.log(values);
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Add New Vehicle</DialogTitle>
-        </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 py-4 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="make"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Make</FormLabel>
-                    <FormControl><Input placeholder="Toyota" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="model"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Model</FormLabel>
-                    <FormControl><Input placeholder="Camry" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="year"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Year</FormLabel>
-                    <FormControl><Input placeholder="2024" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="color"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Color</FormLabel>
-                    <FormControl><Input placeholder="Pearl White" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="dailyRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Daily Rate ($)</FormLabel>
-                    <FormControl><Input type="number" placeholder="65" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="seats"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Seats</FormLabel>
-                    <FormControl><Input type="number" placeholder="5" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="vin"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>VIN Number</FormLabel>
-                  <FormControl><Input placeholder="1HGBH41JXMN109186" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </form>
-        </Form>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="default" onClick={form.handleSubmit(onSubmit)}>Add Vehicle</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

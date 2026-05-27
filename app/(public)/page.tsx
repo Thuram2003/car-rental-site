@@ -1,16 +1,12 @@
-"use client";
-
 import Link from "next/link";
 import Image from "next/image";
 import {
   ShieldCheck, Clock, MapPin, Star, CaretRight, Car, GasPump, Users, Lightning,
-} from "@phosphor-icons/react";
+} from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
-import { MOCK_VEHICLES } from "@/lib/mock-data";
+import { getVehicles } from "@/lib/actions/vehicles";
 import { formatCurrency } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/badge";
-
-const FEATURED = MOCK_VEHICLES.filter((v) => v.status === "Available").slice(0, 3);
 
 const STATS = [
   { value: "500+", label: "Happy Customers" },
@@ -42,7 +38,11 @@ const WHY_US = [
   },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const availableVehicles = await getVehicles({ status: "Available" });
+  const featured = availableVehicles.slice(0, 3);
+  const availableCount = availableVehicles.length;
+
   return (
     <div className="overflow-hidden">
       {/* ── Hero ── */}
@@ -68,7 +68,7 @@ export default function LandingPage() {
               <div className="inline-flex items-center gap-2 bg-orange-500/20 border border-orange-500/30 rounded-full px-4 py-1.5">
                 <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
                 <span className="text-orange-300 text-sm font-medium">
-                  16 vehicles available now
+                  {availableCount} vehicle{availableCount !== 1 ? "s" : ""} available now
                 </span>
               </div>
 
@@ -106,44 +106,46 @@ export default function LandingPage() {
             </div>
 
             {/* Right — hero car card */}
-            <div className="hidden lg:block relative">
-              <div className="relative rounded-3xl overflow-hidden shadow-2xl">
-                <Image
-                  src={FEATURED[1].imageUrl}
-                  alt={`${FEATURED[1].make} ${FEATURED[1].model}`}
-                  width={600}
-                  height={400}
-                  className="w-full h-80 object-cover"
-                  unoptimized
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <p className="text-white font-bold text-xl">
-                        {FEATURED[1].make} {FEATURED[1].model}
-                      </p>
-                      <p className="text-gray-300 text-sm">{FEATURED[1].year} · {FEATURED[1].category}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-orange-400 font-bold text-2xl">
-                        {formatCurrency(FEATURED[1].dailyRate)}
-                      </p>
-                      <p className="text-gray-300 text-xs">per day</p>
+            {featured[1] && (
+              <div className="hidden lg:block relative">
+                <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+                  <Image
+                    src={featured[1].image_url ?? "/placeholder-car.jpg"}
+                    alt={`${featured[1].make} ${featured[1].model}`}
+                    width={600}
+                    height={400}
+                    className="w-full h-80 object-cover"
+                    unoptimized
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <p className="text-white font-bold text-xl">
+                          {featured[1].make} {featured[1].model}
+                        </p>
+                        <p className="text-gray-300 text-sm">{featured[1].year} · {featured[1].category}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-orange-400 font-bold text-2xl">
+                          {formatCurrency(featured[1].daily_rate)}
+                        </p>
+                        <p className="text-gray-300 text-xs">per day</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Floating badge */}
-              <div className="absolute -top-4 -right-4 bg-orange-500 text-white rounded-2xl px-4 py-3 shadow-lg">
-                <div className="flex items-center gap-1.5">
-                  <Star className="h-4 w-4 fill-white" />
-                  <span className="font-bold">4.9</span>
+                {/* Floating badge */}
+                <div className="absolute -top-4 -right-4 bg-orange-500 text-white rounded-2xl px-4 py-3 shadow-lg">
+                  <div className="flex items-center gap-1.5">
+                    <Star className="h-4 w-4 fill-white" />
+                    <span className="font-bold">4.9</span>
+                  </div>
+                  <p className="text-xs text-orange-100">Top Rated</p>
                 </div>
-                <p className="text-xs text-orange-100">Top Rated</p>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </section>
@@ -183,12 +185,12 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURED.map((car) => (
+            {featured.map((car) => (
               <Link key={car.id} href={`/cars/${car.id}`} className="group">
                 <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md hover:border-orange-200 transition-all duration-200">
                   <div className="relative overflow-hidden h-48">
                     <Image
-                      src={car.imageUrl}
+                      src={car.image_url ?? "/placeholder-car.jpg"}
                       alt={`${car.make} ${car.model}`}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -199,7 +201,9 @@ export default function LandingPage() {
                     </div>
                     <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 flex items-center gap-1">
                       <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
-                      <span className="text-xs font-semibold text-gray-700">{car.rating}</span>
+                      <span className="text-xs font-semibold text-gray-700">
+                        {car.average_rating > 0 ? car.average_rating.toFixed(1) : "New"}
+                      </span>
                     </div>
                   </div>
 
@@ -213,7 +217,7 @@ export default function LandingPage() {
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-orange-500 text-lg">
-                          {formatCurrency(car.dailyRate)}
+                          {formatCurrency(car.daily_rate)}
                         </p>
                         <p className="text-xs text-gray-400">/ day</p>
                       </div>
@@ -226,7 +230,7 @@ export default function LandingPage() {
                       </span>
                       <span className="flex items-center gap-1">
                         <GasPump className="h-3.5 w-3.5" />
-                        {car.fuelType}
+                        {car.fuel_type}
                       </span>
                       <span className="flex items-center gap-1">
                         <Car className="h-3.5 w-3.5" />

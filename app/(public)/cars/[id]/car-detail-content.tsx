@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -8,15 +9,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
-import type { Vehicle } from "@/lib/mock-data";
+import { formatCurrency, calculateDays } from "@/lib/utils";
+import type { VehicleWithRating } from "@/lib/supabase/types";
 
 interface CarDetailContentProps {
-  car: Vehicle;
-  similar: Vehicle[];
+  car: VehicleWithRating;
+  similar: VehicleWithRating[];
 }
 
 export function CarDetailContent({ car, similar }: CarDetailContentProps) {
+  const features = Array.isArray(car.features) ? (car.features as string[]) : [];
+  const [pickupDate, setPickupDate] = useState("");
+  const [returnDate, setReturnDate] = useState("");
+  
+  const days = pickupDate && returnDate ? calculateDays(new Date(pickupDate), new Date(returnDate)) : 3;
+  const subtotal = car.daily_rate * days;
+  const serviceFee = 5000;
+  const total = subtotal + serviceFee;
+
   return (
     <div className="min-h-screen bg-page">
       {/* Breadcrumb */}
@@ -39,7 +49,7 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
             {/* Main image */}
             <div className="relative rounded-sm overflow-hidden shadow-sm">
               <Image
-                src={car.imageUrl}
+                src={car.image_url ?? "/placeholder-car.jpg"}
                 alt={`${car.make} ${car.model}`}
                 width={800}
                 height={450}
@@ -52,8 +62,12 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
               </div>
               <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-sm px-3 py-1.5 flex items-center gap-1.5">
                 <Star className="w-4 h-4 text-warning fill-warning" weight="fill" />
-                <span className="font-bold text-gray-800 text-sm">{car.rating}</span>
-                <span className="text-gray-400 text-xs">({car.reviewCount})</span>
+                <span className="font-bold text-gray-800 text-sm">
+                  {car.average_rating > 0 ? car.average_rating.toFixed(1) : "New"}
+                </span>
+                {car.review_count > 0 && (
+                  <span className="text-gray-400 text-xs">({car.review_count})</span>
+                )}
               </div>
             </div>
 
@@ -66,12 +80,12 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
                       {car.make} {car.model}
                     </h1>
                     <p className="text-gray-500 mt-1 text-sm">
-                      {car.year} · {car.color} · {car.location}
+                      {car.year} · {car.color}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-bold text-primary">
-                      {formatCurrency(car.dailyRate)}
+                      {formatCurrency(car.daily_rate)}
                     </p>
                     <p className="text-gray-400 text-xs">per day</p>
                   </div>
@@ -81,7 +95,7 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-5 border-y border-gray-100">
                   {[
                     { icon: Users, label: "Seats", value: `${car.seats} people` },
-                    { icon: GasPump, label: "Fuel", value: car.fuelType },
+                    { icon: GasPump, label: "Fuel", value: car.fuel_type },
                     { icon: Gear, label: "Transmission", value: car.transmission },
                     { icon: Gauge, label: "Mileage", value: `${car.mileage.toLocaleString()} km` },
                   ].map(({ icon: Icon, label, value }) => (
@@ -96,30 +110,32 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
                 </div>
 
                 {/* Features */}
-                <div className="mt-5">
-                  <h3 className="font-semibold text-gray-900 mb-3 text-sm">Features</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {car.features.map((feature) => (
-                      <div key={feature} className="flex items-center gap-2 text-sm text-gray-600">
-                        <div className="w-5 h-5 bg-success-light rounded-full flex items-center justify-center shrink-0">
-                          <Check className="w-3 h-3 text-success" weight="bold" />
+                {features.length > 0 && (
+                  <div className="mt-5">
+                    <h3 className="font-semibold text-gray-900 mb-3 text-sm">Features</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {features.map((feature) => (
+                        <div key={feature} className="flex items-center gap-2 text-sm text-gray-600">
+                          <div className="w-5 h-5 bg-success-light rounded-full flex items-center justify-center shrink-0">
+                            <Check className="w-3 h-3 text-success" weight="bold" />
+                          </div>
+                          {feature}
                         </div>
-                        {feature}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Location */}
+            {/* Location placeholder */}
             <Card className="border-gray-100">
               <CardContent className="p-6">
                 <h3 className="font-semibold text-gray-900 mb-3 text-sm flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-primary" />
                   Pickup Location
                 </h3>
-                <p className="text-gray-600 text-sm">{car.location}</p>
+                <p className="text-gray-600 text-sm">Contact us to confirm pickup branch</p>
                 <div className="mt-3 h-28 bg-gray-50 rounded-sm border border-gray-100 flex items-center justify-center">
                   <p className="text-gray-400 text-xs">Map preview</p>
                 </div>
@@ -154,6 +170,8 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
                         </label>
                         <input
                           type="date"
+                          value={pickupDate}
+                          onChange={(e) => setPickupDate(e.target.value)}
                           className="w-full rounded-sm border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                           min={new Date().toISOString().split("T")[0]}
                         />
@@ -164,8 +182,10 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
                         </label>
                         <input
                           type="date"
+                          value={returnDate}
+                          onChange={(e) => setReturnDate(e.target.value)}
                           className="w-full rounded-sm border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                          min={new Date().toISOString().split("T")[0]}
+                          min={pickupDate || new Date().toISOString().split("T")[0]}
                         />
                       </div>
                     </div>
@@ -173,8 +193,8 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
                     {/* Price breakdown */}
                     <div className="bg-gray-50 rounded-sm p-4 space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">{formatCurrency(car.dailyRate)} × 3 days</span>
-                        <span className="text-gray-700 font-medium">{formatCurrency(car.dailyRate * 3)}</span>
+                        <span className="text-gray-500">{formatCurrency(car.daily_rate)} × {days} day{days > 1 ? 's' : ''}</span>
+                        <span className="text-gray-700 font-medium">{formatCurrency(subtotal)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Insurance</span>
@@ -182,17 +202,17 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Service fee</span>
-                        <span className="text-gray-700 font-medium">{formatCurrency(5000)}</span>
+                        <span className="text-gray-700 font-medium">{formatCurrency(serviceFee)}</span>
                       </div>
                       <div className="border-t border-gray-200 pt-2 flex justify-between">
                         <span className="font-semibold text-gray-900">Total</span>
                         <span className="font-bold text-primary text-lg">
-                          {formatCurrency(car.dailyRate * 3 + 5000)}
+                          {formatCurrency(total)}
                         </span>
                       </div>
                     </div>
 
-                    <Link href={`/login?redirectTo=/book?carId=${car.id}`}>
+                    <Link href={`/book?carId=${car.id}${pickupDate ? `&startDate=${pickupDate}` : ''}${returnDate ? `&endDate=${returnDate}` : ''}`}>
                       <Button variant="default" size="lg" className="w-full">
                         Continue to Book
                       </Button>
@@ -239,7 +259,7 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
                   <Card className="overflow-hidden border-gray-100 hover:border-primary-light hover:shadow-md transition-all">
                     <div className="relative h-40 overflow-hidden">
                       <Image
-                        src={v.imageUrl}
+                        src={v.image_url ?? "/placeholder-car.jpg"}
                         alt={`${v.make} ${v.model}`}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -252,7 +272,7 @@ export function CarDetailContent({ car, similar }: CarDetailContentProps) {
                         <p className="text-xs text-gray-400">{v.year}</p>
                       </div>
                       <p className="font-bold text-primary text-sm">
-                        {formatCurrency(v.dailyRate)}<span className="text-xs text-gray-400 font-normal">/day</span>
+                        {formatCurrency(v.daily_rate)}<span className="text-xs text-gray-400 font-normal">/day</span>
                       </p>
                     </CardContent>
                   </Card>

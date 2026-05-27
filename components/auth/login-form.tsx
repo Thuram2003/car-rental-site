@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -17,7 +17,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { signIn } from "@/lib/actions/auth";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Email is required").email("Please enter a valid email"),
@@ -30,18 +32,60 @@ type LoginValues = z.infer<typeof loginSchema>;
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, setIsPending] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "", rememberMe: false },
   });
 
+  // Show success message if coming from email verification
+  useEffect(() => {
+    if (searchParams.get("verified") === "true") {
+      toast.success("Email verified!", {
+        description: "You can now log in to your account.",
+      });
+    }
+  }, [searchParams]);
+
   const onSubmit = async (values: LoginValues) => {
     setIsPending(true);
-    // Supabase auth will go here
-    await new Promise((r) => setTimeout(r, 1200));
-    setIsPending(false);
-    toast.success("Welcome back!", { description: "Redirecting to your dashboard..." });
+    
+    try {
+      const { error, redirectTo, needsVerification } = await signIn(values.email, values.password);
+      
+      if (error) {
+        toast.error("Sign in failed", { description: error.message });
+        setIsPending(false);
+        return;
+      }
+      
+      if (needsVerification) {
+        toast.info("Email not verified", { 
+          description: "Please verify your email to continue." 
+        });
+        router.push(redirectTo ?? `/verify-email?email=${encodeURIComponent(values.email)}`);
+        setIsPending(false);
+        return;
+      }
+      
+      // Success - show message and redirect
+      toast.success("Welcome back!", { description: "Redirecting..." });
+      
+      // Small delay to ensure cookies are set
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Force router refresh to update server components
+      router.refresh();
+      
+      // Then navigate
+      router.push(redirectTo ?? "/");
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error("An unexpected error occurred");
+      setIsPending(false);
+    }
   };
 
   return (

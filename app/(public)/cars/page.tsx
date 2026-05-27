@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -10,8 +10,8 @@ import {
   Users,
   GasPump,
   Car,
-  MapPin,
   X,
+  CircleNotch,
 } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,11 +19,13 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge, StatusBadge } from "@/components/ui/badge";
-import { MOCK_VEHICLES, type VehicleCategory } from "@/lib/mock-data";
+import { getVehicles } from "@/lib/actions/vehicles";
 import { formatCurrency } from "@/lib/utils";
+import type { VehicleWithRating } from "@/lib/supabase/types";
+
+type VehicleCategory = "Economy" | "SUV" | "Luxury" | "Sports" | "Van";
 
 const CATEGORIES: VehicleCategory[] = ["Economy", "SUV", "Luxury", "Sports", "Van"];
-const LOCATIONS = ["All Locations", "Douala Branch", "Airport Branch", "Yaoundé Branch"];
 const FUEL_TYPES = ["All", "Petrol", "Diesel", "Electric", "Hybrid"];
 const SORT_OPTIONS = [
   { value: "price-asc", label: "Price: Low to High" },
@@ -33,16 +35,27 @@ const SORT_OPTIONS = [
 ];
 
 export default function CarsPage() {
+  const [vehicles, setVehicles] = useState<VehicleWithRating[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("All");
-  const [location, setLocation] = useState("All Locations");
   const [fuelType, setFuelType] = useState("All");
   const [sortBy, setSortBy] = useState("rating");
   const [showFilters, setShowFilters] = useState(false);
   const [maxPrice, setMaxPrice] = useState(250000);
 
+  useEffect(() => {
+    async function fetchVehicles() {
+      setLoading(true);
+      const data = await getVehicles();
+      setVehicles(data);
+      setLoading(false);
+    }
+    fetchVehicles();
+  }, []);
+
   const filtered = useMemo(() => {
-    let result = [...MOCK_VEHICLES];
+    let result = [...vehicles];
 
     if (search) {
       const q = search.toLowerCase();
@@ -58,40 +71,35 @@ export default function CarsPage() {
       result = result.filter((v) => v.category === category);
     }
 
-    if (location !== "All Locations") {
-      result = result.filter((v) => v.location === location);
-    }
-
     if (fuelType !== "All") {
-      result = result.filter((v) => v.fuelType === fuelType);
+      result = result.filter((v) => v.fuel_type === fuelType);
     }
 
-    result = result.filter((v) => v.dailyRate <= maxPrice);
+    result = result.filter((v) => v.daily_rate <= maxPrice);
 
     result.sort((a, b) => {
-      if (sortBy === "price-asc") return a.dailyRate - b.dailyRate;
-      if (sortBy === "price-desc") return b.dailyRate - a.dailyRate;
-      if (sortBy === "rating") return b.rating - a.rating;
+      if (sortBy === "price-asc") return a.daily_rate - b.daily_rate;
+      if (sortBy === "price-desc") return b.daily_rate - a.daily_rate;
+      if (sortBy === "rating") return (b.average_rating ?? 0) - (a.average_rating ?? 0);
       if (sortBy === "newest") return b.year - a.year;
       return 0;
     });
 
     return result;
-  }, [search, category, location, fuelType, sortBy, maxPrice]);
+  }, [vehicles, search, category, fuelType, sortBy, maxPrice]);
 
   const available = filtered.filter((v) => v.status === "Available").length;
 
   const clearFilters = () => {
     setSearch("");
     setCategory("All");
-    setLocation("All Locations");
     setFuelType("All");
     setSortBy("rating");
     setMaxPrice(250000);
   };
 
   const hasActiveFilters =
-    search || category !== "All" || location !== "All Locations" || fuelType !== "All" || maxPrice < 250000;
+    search || category !== "All" || fuelType !== "All" || maxPrice < 250000;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -102,7 +110,7 @@ export default function CarsPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Browse Cars</h1>
               <p className="text-gray-500 text-sm mt-1">
-                {available} vehicles available · {filtered.length} total results
+                {loading ? "Loading..." : `${available} vehicles available · ${filtered.length} total results`}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -168,20 +176,7 @@ export default function CarsPage() {
 
           {/* Expanded filters */}
           {showFilters && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 grid sm:grid-cols-3 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-700">Location</label>
-                <Select value={location} onValueChange={setLocation}>
-                  <SelectTrigger size="sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LOCATIONS.map((l) => (
-                      <SelectItem key={l} value={l}>{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 grid sm:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-gray-700">Fuel Type</label>
                 <Select value={fuelType} onValueChange={setFuelType}>
@@ -222,7 +217,7 @@ export default function CarsPage() {
               <span className="text-xs text-gray-500">Active filters:</span>
               {search && (
                 <Badge variant="outline" className="gap-1">
-                  "{search}"
+                  &quot;{search}&quot;
                   <button onClick={() => setSearch("")}>
                     <X className="h-3 w-3" />
                   </button>
@@ -249,7 +244,11 @@ export default function CarsPage() {
 
       {/* Car grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <CircleNotch className="h-8 w-8 text-orange-500 animate-spin" />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-20">
             <Car className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700">No cars found</h3>
@@ -265,7 +264,7 @@ export default function CarsPage() {
                 <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md hover:border-orange-200 transition-all duration-200 h-full flex flex-col">
                   <div className="relative overflow-hidden h-44">
                     <Image
-                      src={car.imageUrl}
+                      src={car.image_url ?? "/placeholder-car.jpg"}
                       alt={`${car.make} ${car.model}`}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -276,8 +275,12 @@ export default function CarsPage() {
                     </div>
                     <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 flex items-center gap-1">
                       <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
-                      <span className="text-xs font-semibold text-gray-700">{car.rating}</span>
-                      <span className="text-xs text-gray-400">({car.reviewCount})</span>
+                      <span className="text-xs font-semibold text-gray-700">
+                        {car.average_rating > 0 ? car.average_rating.toFixed(1) : "New"}
+                      </span>
+                      {car.review_count > 0 && (
+                        <span className="text-xs text-gray-400">({car.review_count})</span>
+                      )}
                     </div>
                   </div>
 
@@ -291,7 +294,7 @@ export default function CarsPage() {
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-orange-500">
-                          {formatCurrency(car.dailyRate)}
+                          {formatCurrency(car.daily_rate)}
                         </p>
                         <p className="text-xs text-gray-400">/ day</p>
                       </div>
@@ -304,11 +307,7 @@ export default function CarsPage() {
                       </span>
                       <span className="flex items-center gap-1">
                         <GasPump className="h-3.5 w-3.5" />
-                        {car.fuelType}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5" />
-                        {car.location.split(" ")[0]}
+                        {car.fuel_type}
                       </span>
                     </div>
 

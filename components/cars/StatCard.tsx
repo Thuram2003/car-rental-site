@@ -2,10 +2,10 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "@phosphor-icons/react";
+import { Plus, Money, CalendarBlank, Car, Users } from "@phosphor-icons/react";
 
 interface StatCardProps {
-  icon: React.ElementType;
+  icon: "money" | "calendar" | "car" | "users";
   label: string;
   value?: string;
   count?: number;
@@ -14,7 +14,16 @@ interface StatCardProps {
   onAdd?: () => void;
 }
 
-export function StatCard({ icon: Icon, label, value, count, trend, trendUp, onAdd }: StatCardProps) {
+const iconMap = {
+  money: Money,
+  calendar: CalendarBlank,
+  car: Car,
+  users: Users,
+};
+
+export function StatCard({ icon, label, value, count, trend, trendUp, onAdd }: StatCardProps) {
+  const Icon = iconMap[icon];
+  
   return (
     <Card className="p-5 flex items-center justify-between hover:shadow-md transition-all border-gray-100 bg-white">
       <div className="flex items-center gap-3">

@@ -1,58 +1,73 @@
-"use client";
-
 import Link from "next/link";
 import {
-  TrendUp, Money, CalendarBlank, Car, Users,
-  ArrowUpRight, CaretRight,
-} from "@phosphor-icons/react";
+  TrendUp, CalendarBlank, Car, CaretRight,
+} from "@phosphor-icons/react/dist/ssr";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { StatCard, MetricBox, SummaryCard, BookingItem, CarItem } from "@/components/cars";
+import { StatCard, SummaryCard } from "@/components/cars";
 import {
   Table, TableHeader, TableBody, TableHead, TableRow, TableCell,
 } from "@/components/ui/table";
-import {
-  ADMIN_STATS, MOCK_BOOKINGS, MOCK_VEHICLES, REVENUE_DATA,
-} from "@/lib/mock-data";
+import { getDashboardStats, getAllBookingsSummary } from "@/lib/actions/bookings";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import type { BookingSummary } from "@/lib/supabase/types";
 
-const MAX_REVENUE = Math.max(...REVENUE_DATA.map((d) => d.revenue));
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w.charAt(0))
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
-export default function AdminDashboard() {
-  const recentBookings = MOCK_BOOKINGS.slice(0, 4);
-  const availableVehicles = MOCK_VEHICLES.filter((v) => v.status === "Available").slice(0, 4);
+export default async function AdminDashboard() {
+  const [stats, allBookings] = await Promise.all([
+    getDashboardStats(),
+    getAllBookingsSummary(),
+  ]);
+
+  const recentBookings = allBookings.slice(0, 4);
+  const revenueByMonth = stats.revenueByMonth;
+  const maxRevenue = Math.max(...revenueByMonth.map((d) => d.revenue), 1);
+
+  const fleetItems = [
+    { label: "Available", count: stats.availableVehicles, color: "bg-success", pct: stats.totalVehicles > 0 ? Math.round((stats.availableVehicles / stats.totalVehicles) * 100) : 0 },
+    { label: "Rented", count: stats.rentedVehicles, color: "bg-info", pct: stats.totalVehicles > 0 ? Math.round((stats.rentedVehicles / stats.totalVehicles) * 100) : 0 },
+    { label: "Maintenance", count: stats.maintenanceVehicles, color: "bg-warning", pct: stats.totalVehicles > 0 ? Math.round((stats.maintenanceVehicles / stats.totalVehicles) * 100) : 0 },
+  ];
 
   return (
     <div className="space-y-6">
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          icon={Money}
+          icon="money"
           label="Total Revenue"
-          value={formatCurrency(ADMIN_STATS.totalRevenue)}
-          trend={`+${ADMIN_STATS.revenueGrowth}% this month`}
+          value={formatCurrency(stats.totalRevenue)}
+          trend="From completed bookings"
           trendUp
         />
         <StatCard
-          icon={CalendarBlank}
+          icon="calendar"
           label="Total Bookings"
-          count={ADMIN_STATS.totalBookings}
-          trend={`+${ADMIN_STATS.bookingsGrowth}% this month`}
+          count={stats.totalBookings}
+          trend="All time"
           trendUp
         />
         <StatCard
-          icon={Car}
+          icon="car"
           label="Active Rentals"
-          count={ADMIN_STATS.activeRentals}
+          count={stats.activeRentals}
           trend="Live now"
           trendUp
         />
         <StatCard
-          icon={Users}
+          icon="users"
           label="Fleet Utilization"
-          value={`${ADMIN_STATS.fleetUtilization}%`}
-          trend={`${ADMIN_STATS.availableVehicles} available`}
+          value={`${stats.fleetUtilization}%`}
+          trend={`${stats.availableVehicles} available`}
           trendUp
         />
       </div>
@@ -75,9 +90,9 @@ export default function AdminDashboard() {
           <CardContent className="p-5 pt-2">
             {/* CSS bar chart */}
             <div className="flex items-end gap-3 h-36">
-              {REVENUE_DATA.map((d) => {
-                const height = (d.revenue / MAX_REVENUE) * 100;
-                const isLast = d === REVENUE_DATA[REVENUE_DATA.length - 1];
+              {revenueByMonth.map((d, i) => {
+                const height = (d.revenue / maxRevenue) * 100;
+                const isLast = i === revenueByMonth.length - 1;
                 return (
                   <div key={d.month} className="flex-1 flex flex-col items-center gap-2">
                     <div className="w-full flex flex-col justify-end" style={{ height: "110px" }}>
@@ -97,7 +112,7 @@ export default function AdminDashboard() {
               <span className="text-xs text-gray-500">
                 Total:{" "}
                 <span className="font-semibold text-gray-900">
-                  {formatCurrency(REVENUE_DATA.reduce((s, d) => s + d.revenue, 0))}
+                  {formatCurrency(revenueByMonth.reduce((s, d) => s + d.revenue, 0))}
                 </span>
               </span>
               <Link href="/admin/reports">
@@ -122,11 +137,7 @@ export default function AdminDashboard() {
             </div>
           </CardHeader>
           <CardContent className="p-5 pt-2 space-y-4">
-            {[
-              { label: "Available", count: 16, color: "bg-success", pct: 67 },
-              { label: "Rented", count: 6, color: "bg-info", pct: 25 },
-              { label: "Maintenance", count: 2, color: "bg-warning", pct: 8 },
-            ].map(({ label, count, color, pct }) => (
+            {fleetItems.map(({ label, count, color, pct }) => (
               <div key={label}>
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="text-gray-600">{label}</span>
@@ -139,7 +150,7 @@ export default function AdminDashboard() {
             ))}
 
             <div className="text-center py-3 bg-gray-50 rounded-sm mt-2">
-              <p className="text-2xl font-bold text-gray-900">{ADMIN_STATS.totalVehicles}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalVehicles}</p>
               <p className="text-xs text-gray-500">Total Vehicles</p>
             </div>
           </CardContent>
@@ -147,33 +158,67 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent bookings */}
+        {/* Recent bookings summary */}
         <SummaryCard
           title="Recent Bookings"
           emptyIcon={CalendarBlank}
           emptyText="No bookings yet"
           hasData={recentBookings.length > 0}
-          onSeeAll={() => {}}
         >
           <div className="space-y-1.5">
-            {recentBookings.map((booking) => (
-              <BookingItem key={booking.id} booking={booking} />
+            {recentBookings.map((booking: BookingSummary) => (
+              <div
+                key={booking.id}
+                className="flex items-center justify-between px-2 py-1.5 border border-gray-100 rounded-sm hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-primary-light flex items-center justify-center shrink-0">
+                    <span className="text-primary font-semibold text-xs">
+                      {getInitials(booking.customer_name)}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-900 truncate leading-tight">
+                      {booking.customer_name}
+                    </p>
+                    <p className="text-[11px] text-gray-400 leading-tight">{booking.vehicle_name}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <StatusBadge status={booking.booking_status} className="text-[10px] px-1.5 py-0 hidden sm:inline-flex" />
+                  <p className="text-xs font-semibold text-primary hidden md:block">
+                    {formatCurrency(booking.total_amount)}
+                  </p>
+                </div>
+              </div>
             ))}
           </div>
         </SummaryCard>
 
-        {/* Available vehicles */}
+        {/* Fleet summary */}
         <SummaryCard
           title="Available Vehicles"
           emptyIcon={Car}
           emptyText="No vehicles available"
-          hasData={availableVehicles.length > 0}
-          onSeeAll={() => {}}
+          hasData={stats.availableVehicles > 0}
         >
           <div className="space-y-1.5">
-            {availableVehicles.map((vehicle) => (
-              <CarItem key={vehicle.id} vehicle={vehicle} />
-            ))}
+            <div className="flex items-center justify-between px-3 py-2 border border-gray-100 rounded-sm">
+              <span className="text-xs text-gray-600">Available</span>
+              <span className="text-xs font-semibold text-success">{stats.availableVehicles}</span>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2 border border-gray-100 rounded-sm">
+              <span className="text-xs text-gray-600">Rented</span>
+              <span className="text-xs font-semibold text-info">{stats.rentedVehicles}</span>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2 border border-gray-100 rounded-sm">
+              <span className="text-xs text-gray-600">Maintenance</span>
+              <span className="text-xs font-semibold text-warning">{stats.maintenanceVehicles}</span>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2 border border-gray-100 rounded-sm">
+              <span className="text-xs text-gray-600">Total Fleet</span>
+              <span className="text-xs font-semibold text-gray-900">{stats.totalVehicles}</span>
+            </div>
           </div>
         </SummaryCard>
       </div>
@@ -202,25 +247,25 @@ export default function AdminDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {MOCK_BOOKINGS.map((booking) => (
+              {allBookings.map((booking: BookingSummary) => (
                 <TableRow key={booking.id}>
                   <TableCell>
-                    <p className="font-medium text-gray-900">{booking.customerName}</p>
-                    <p className="text-xs text-gray-400 font-mono">{booking.id.toUpperCase()}</p>
+                    <p className="font-medium text-gray-900">{booking.customer_name}</p>
+                    <p className="text-xs text-gray-400 font-mono">{booking.id.toUpperCase().slice(0, 8)}</p>
                   </TableCell>
                   <TableCell>
-                    <p className="text-gray-700">{booking.vehicle.make} {booking.vehicle.model}</p>
-                    <p className="text-xs text-gray-400">{booking.vehicle.year}</p>
+                    <p className="text-gray-700">{booking.vehicle_name}</p>
+                    <p className="text-xs text-gray-400">{booking.license_plate}</p>
                   </TableCell>
                   <TableCell>
-                    <p className="text-gray-700">{formatDate(booking.startDate)}</p>
-                    <p className="text-xs text-gray-400">→ {formatDate(booking.endDate)}</p>
+                    <p className="text-gray-700">{formatDate(booking.start_date)}</p>
+                    <p className="text-xs text-gray-400">→ {formatDate(booking.end_date)}</p>
                   </TableCell>
                   <TableCell>
-                    <span className="font-semibold text-gray-900">{formatCurrency(booking.totalCost)}</span>
+                    <span className="font-semibold text-gray-900">{formatCurrency(booking.total_amount)}</span>
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={booking.status} />
+                    <StatusBadge status={booking.booking_status} />
                   </TableCell>
                 </TableRow>
               ))}

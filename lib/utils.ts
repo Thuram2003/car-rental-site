@@ -31,5 +31,6 @@ export function formatDate(date: string | Date): string {
 }
 
 export function calculateDays(start: Date, end: Date): number {
-  return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return days + 1; // Include both start and end dates
 }
