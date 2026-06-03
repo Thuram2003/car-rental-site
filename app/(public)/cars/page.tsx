@@ -1,23 +1,29 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   MagnifyingGlass,
   Sliders,
-  Star,
   Users,
   GasPump,
   Car,
   X,
   CircleNotch,
+  FadersHorizontal,
+  ArrowsDownUp,
+  Sparkle,
+  Gauge,
+  Calendar,
 } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { getVehicles } from "@/lib/actions/vehicles";
 import { formatCurrency } from "@/lib/utils";
@@ -34,7 +40,11 @@ const SORT_OPTIONS = [
   { value: "newest", label: "Newest First" },
 ];
 
-export default function CarsPage() {
+function CarsPageInner() {
+  const searchParams = useSearchParams();
+  const urlCategory = searchParams.get("category");
+  const urlSearch = searchParams.get("search");
+
   const [vehicles, setVehicles] = useState<VehicleWithRating[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -42,7 +52,21 @@ export default function CarsPage() {
   const [fuelType, setFuelType] = useState("All");
   const [sortBy, setSortBy] = useState("rating");
   const [showFilters, setShowFilters] = useState(false);
-  const [maxPrice, setMaxPrice] = useState(250000);
+  const [maxPrice, setMaxPrice] = useState(1000000);
+
+  // Sync category and search query from URL parameters
+  useEffect(() => {
+    if (urlCategory) {
+      const cleanCat = CATEGORIES.find(c => c.toLowerCase() === urlCategory.toLowerCase()) || "All";
+      setCategory(cleanCat);
+    } else {
+      setCategory("All");
+    }
+
+    if (urlSearch) {
+      setSearch(urlSearch);
+    }
+  }, [urlCategory, urlSearch]);
 
   useEffect(() => {
     async function fetchVehicles() {
@@ -95,92 +119,116 @@ export default function CarsPage() {
     setCategory("All");
     setFuelType("All");
     setSortBy("rating");
-    setMaxPrice(250000);
+    setMaxPrice(1000000);
   };
 
   const hasActiveFilters =
-    search || category !== "All" || fuelType !== "All" || maxPrice < 250000;
+    search || category !== "All" || fuelType !== "All" || maxPrice < 1000000;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Page header */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Browse Cars</h1>
-              <p className="text-gray-500 text-sm mt-1">
-                {loading ? "Loading..." : `${available} vehicles available · ${filtered.length} total results`}
+    <div className="min-h-screen bg-gray-50/50">
+      {/* Visual Pattern Overlays */}
+      <div className="absolute inset-x-0 top-0 h-96 bg-gradient-to-b from-orange-500/5 to-transparent pointer-events-none z-0" />
+
+      {/* Header Container */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-4">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-6">
+          
+          {/* Top Row: Brand Header and sorting */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 text-orange-600 text-xs font-semibold uppercase tracking-wider">
+                <Sparkle className="w-3.5 h-3.5" />
+                DriveGo Fleet
+              </div>
+              <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Browse Our Fleet</h1>
+              <p className="text-gray-500 text-sm">
+                {loading ? "Loading inventory..." : `${available} active vehicles ready · ${filtered.length} matching results`}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-48" size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SORT_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Sort selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">Sort By</span>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-48 h-10 border-gray-200" size="sm">
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <ArrowsDownUp className="w-4 h-4 text-gray-400" />
+                      <SelectValue />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filter button */}
               <Button
                 variant="outline"
-                size="sm"
+                size="default"
                 onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2"
+                className={`h-10 gap-2 border-gray-200 font-semibold transition-all ${
+                  showFilters ? "bg-orange-500 text-white border-orange-500 hover:bg-orange-600 hover:text-white" : "text-gray-700 hover:bg-gray-50"
+                }`}
               >
-                <Sliders className="w-4 h-4" />
-                Filters
+                <FadersHorizontal className="w-4.5 h-4.5" />
+                Advanced Filters
                 {hasActiveFilters && (
-                  <span className="w-2 h-2 bg-primary rounded-full" />
+                  <span className={`w-2 h-2 rounded-full ${showFilters ? "bg-white" : "bg-orange-500"}`} />
                 )}
               </Button>
             </div>
           </div>
 
-          {/* Search bar */}
-          <div className="mt-4">
-            <Input
-              placeholder="Search by make, model, or type..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              icon={<MagnifyingGlass className="h-4 w-4" />}
-              iconRight={
-                search ? (
-                  <button onClick={() => setSearch("")}>
-                    <X className="h-4 w-4 hover:text-gray-600" />
-                  </button>
-                ) : undefined
-              }
-              className="max-w-lg"
-            />
+          {/* Search bar & Categories line */}
+          <div className="grid md:grid-cols-12 gap-4 items-center">
+            {/* Search */}
+            <div className="md:col-span-4">
+              <Input
+                placeholder="Search by make, model..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                icon={<MagnifyingGlass className="h-4.5 w-4.5 text-gray-400" />}
+                iconRight={
+                  search ? (
+                    <button onClick={() => setSearch("")} className="text-gray-400 hover:text-gray-600">
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : undefined
+                }
+                className="h-11 border-gray-200 placeholder:text-gray-300"
+              />
+            </div>
+
+            {/* Category pills */}
+            <div className="md:col-span-8 flex flex-wrap gap-2 items-center justify-start lg:justify-end">
+              {["All", ...CATEGORIES].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCategory(cat)}
+                  className={`px-4 py-2 rounded-2xl text-sm font-semibold transition-all ${
+                    category === cat
+                      ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
+                      : "bg-gray-50 border border-gray-100 text-gray-600 hover:border-orange-200 hover:text-orange-500 hover:bg-orange-50/20"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Category pills */}
-          <div className="flex items-center gap-2 mt-4 flex-wrap">
-            {["All", ...CATEGORIES].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                  category === cat
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "bg-white border border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Expanded filters */}
+          {/* Expanded filters details */}
           {showFilters && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 grid sm:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-700">Fuel Type</label>
+            <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 grid sm:grid-cols-2 gap-8 animate-in slide-in-from-top-4 duration-200">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Fuel Type</label>
                 <Select value={fuelType} onValueChange={setFuelType}>
-                  <SelectTrigger size="sm">
+                  <SelectTrigger className="h-10 border-gray-200 bg-white" size="sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -190,22 +238,24 @@ export default function CarsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-700">
-                  Max Price: {formatCurrency(maxPrice)}/day
+
+              <div className="flex flex-col gap-2.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex justify-between">
+                  <span>Maximum Daily Rate</span>
+                  <span className="text-orange-500 font-bold">{formatCurrency(maxPrice)}/day</span>
                 </label>
                 <input
                   type="range"
                   min={25000}
-                  max={250000}
-                  step={5000}
+                  max={1000000}
+                  step={25000}
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
-                  className="accent-orange-500"
+                  className="accent-orange-500 h-1.5 w-full bg-gray-200 rounded-lg appearance-none cursor-pointer"
                 />
-                <div className="flex justify-between text-xs text-gray-400">
-                  <span>25 000 FCFA</span>
-                  <span>250 000 FCFA</span>
+                <div className="flex justify-between text-[11px] text-gray-400 font-semibold">
+                  <span>25,000 FCFA</span>
+                  <span>1,000,000 FCFA</span>
                 </div>
               </div>
             </div>
@@ -213,27 +263,43 @@ export default function CarsPage() {
 
           {/* Active filter chips */}
           {hasActiveFilters && (
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
-              <span className="text-xs text-gray-500">Active filters:</span>
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-50 flex-wrap">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Active filters:</span>
               {search && (
-                <Badge variant="outline" className="gap-1">
-                  &quot;{search}&quot;
-                  <button onClick={() => setSearch("")}>
+                <Badge variant="outline" className="gap-1 bg-gray-50/50 border-gray-200 text-gray-700 py-1 px-2.5 rounded-full text-xs font-semibold">
+                  Query: &quot;{search}&quot;
+                  <button onClick={() => setSearch("")} className="text-gray-400 hover:text-gray-900">
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
               )}
               {category !== "All" && (
-                <Badge variant="outline" className="gap-1">
-                  {category}
-                  <button onClick={() => setCategory("All")}>
+                <Badge variant="outline" className="gap-1 bg-gray-50/50 border-gray-200 text-gray-700 py-1 px-2.5 rounded-full text-xs font-semibold">
+                  Category: {category}
+                  <button onClick={() => setCategory("All")} className="text-gray-400 hover:text-gray-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {fuelType !== "All" && (
+                <Badge variant="outline" className="gap-1 bg-gray-50/50 border-gray-200 text-gray-700 py-1 px-2.5 rounded-full text-xs font-semibold">
+                  Fuel: {fuelType}
+                  <button onClick={() => setFuelType("All")} className="text-gray-400 hover:text-gray-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {maxPrice < 1000000 && (
+                <Badge variant="outline" className="gap-1 bg-gray-50/50 border-gray-200 text-gray-700 py-1 px-2.5 rounded-full text-xs font-semibold">
+                  Under: {formatCurrency(maxPrice)}
+                  <button onClick={() => setMaxPrice(1000000)} className="text-gray-400 hover:text-gray-900">
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
               )}
               <button
                 onClick={clearFilters}
-                className="text-xs text-orange-500 hover:text-orange-600 font-medium"
+                className="text-xs text-orange-500 hover:text-orange-600 font-bold uppercase tracking-wider pl-1.5"
               >
                 Clear all
               </button>
@@ -242,92 +308,119 @@ export default function CarsPage() {
         </div>
       </div>
 
-      {/* Car grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Car Grid Container */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <CircleNotch className="h-8 w-8 text-orange-500 animate-spin" />
+          <div className="flex items-center justify-center py-32">
+            <CircleNotch className="h-10 w-10 text-orange-500 animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <Car className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-700">No cars found</h3>
-            <p className="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>
-              Clear Filters
+          <div className="text-center py-24 bg-white rounded-3xl border border-gray-100 p-8 max-w-xl mx-auto shadow-sm">
+            <Car className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No vehicles found</h3>
+            <p className="text-gray-500 font-light text-sm max-w-xs mx-auto leading-relaxed">
+              We couldn't find any vehicles matching your filter criteria. Try adjusting your search query or price sliders.
+            </p>
+            <Button variant="default" size="default" className="mt-6 bg-orange-500 hover:bg-orange-600 text-white font-semibold" onClick={clearFilters}>
+              Reset Filters
             </Button>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
             {filtered.map((car) => (
               <Link key={car.id} href={`/cars/${car.id}`} className="group">
-                <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md hover:border-orange-200 transition-all duration-200 h-full flex flex-col">
-                  <div className="relative overflow-hidden h-44">
+                <Card className="bg-white rounded-3xl overflow-hidden border border-gray-100 hover:shadow-xl hover:border-orange-200 transition-all duration-300 h-full flex flex-col group shadow-sm">
+                  {/* Vehicle Image section */}
+                  <div className="relative overflow-hidden h-52 shrink-0 bg-gray-50">
                     <Image
                       src={car.image_url ?? "/placeholder-car.jpg"}
                       alt={`${car.make} ${car.model}`}
                       fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
                       unoptimized
                     />
-                    <div className="absolute top-3 left-3">
+                    
+                    {/* Status Badge overlay */}
+                    <div className="absolute top-4 left-4 z-10">
                       <StatusBadge status={car.status} />
                     </div>
-                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 flex items-center gap-1">
-                      <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
-                      <span className="text-xs font-semibold text-gray-700">
-                        {car.average_rating > 0 ? car.average_rating.toFixed(1) : "New"}
-                      </span>
-                      {car.review_count > 0 && (
-                        <span className="text-xs text-gray-400">({car.review_count})</span>
-                      )}
+
+                    {/* Category overlay */}
+                    <div className="absolute bottom-4 right-4 z-10">
+                      <Badge variant="secondary" className="bg-white/95 backdrop-blur-sm shadow-sm py-1 px-2.5 rounded-xl border-none text-[11px] font-bold tracking-wider text-gray-700 uppercase">
+                        {car.category}
+                      </Badge>
                     </div>
                   </div>
 
-                  <div className="p-4 flex flex-col flex-1">
-                    <div className="flex items-start justify-between mb-2">
+                  {/* Details section */}
+                  <div className="p-5 flex flex-col flex-1 space-y-4">
+                    {/* Title and price row */}
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="font-bold text-gray-900 text-sm">
+                        <h3 className="font-extrabold text-gray-900 text-base leading-tight group-hover:text-orange-500 transition-colors">
                           {car.make} {car.model}
                         </h3>
-                        <p className="text-xs text-gray-500">{car.year} · {car.color}</p>
+                        <p className="text-xs text-gray-400 mt-1 font-medium">{car.color} · {car.year}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-orange-500">
+                      <div className="text-right shrink-0">
+                        <p className="font-extrabold text-orange-500 text-base leading-none">
                           {formatCurrency(car.daily_rate)}
                         </p>
-                        <p className="text-xs text-gray-400">/ day</p>
+                        <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider">/ day</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3.5 w-3.5" />
-                        {car.seats}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <GasPump className="h-3.5 w-3.5" />
-                        {car.fuel_type}
-                      </span>
+                    {/* Specs badges layout */}
+                    <div className="grid grid-cols-3 gap-2 py-3 border-y border-gray-50 text-[11px] text-gray-500 font-medium">
+                      <div className="flex items-center gap-1.5 justify-center bg-gray-50/50 rounded-xl py-1">
+                        <Users className="h-4 w-4 text-orange-400" />
+                        <span>{car.seats} seats</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 justify-center bg-gray-50/50 rounded-xl py-1">
+                        <GasPump className="h-4 w-4 text-blue-400" />
+                        <span>{car.fuel_type}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 justify-center bg-gray-50/50 rounded-xl py-1">
+                        <Gauge className="h-4 w-4 text-emerald-400" />
+                        <span className="truncate">{car.transmission}</span>
+                      </div>
                     </div>
 
-                    <div className="mt-auto">
+                    {/* CTA button */}
+                    <div className="mt-auto pt-2">
                       <Button
                         variant={car.status === "Available" ? "default" : "outline"}
                         size="sm"
-                        className="w-full"
+                        className={`w-full h-10 font-bold transition-all rounded-xl ${
+                          car.status === "Available" 
+                            ? "bg-orange-500 hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/10 text-white" 
+                            : "border-gray-200 text-gray-400 hover:bg-white cursor-not-allowed"
+                        }`}
                         disabled={car.status !== "Available"}
                       >
                         {car.status === "Available" ? "Book Now" : car.status}
                       </Button>
                     </div>
                   </div>
-                </div>
+                </Card>
               </Link>
             ))}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+export default function CarsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-32 min-h-screen bg-gray-50">
+        <CircleNotch className="h-10 w-10 text-orange-500 animate-spin" />
+      </div>
+    }>
+      <CarsPageInner />
+    </Suspense>
   );
 }

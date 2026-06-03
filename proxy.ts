@@ -25,7 +25,7 @@ const adminRoutes = [
   "/admin",
 ];
 
-export default async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

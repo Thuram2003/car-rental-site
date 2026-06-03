@@ -26,12 +26,17 @@ export default async function PublicLayout({
       profile = {
         id: user.id,
         full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
-        role: user.user_metadata?.role || "customer",
-        email: user.email || "",
-        phone: user.user_metadata?.phone || "",
+        role: (user.user_metadata?.role || "customer") as "customer" | "admin" | "staff",
+        phone: user.user_metadata?.phone || null,
         avatar_url: user.user_metadata?.avatar_url || null,
+        license_number: null,
+        license_expiry_date: null,
+        date_of_birth: null,
+        address: null,
+        city: null,
+        country: null,
         created_at: user.created_at,
-        updated_at: user.updated_at,
+        updated_at: user.updated_at || user.created_at,
       };
     }
   }

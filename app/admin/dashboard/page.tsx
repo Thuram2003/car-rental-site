@@ -41,7 +41,7 @@ export default async function AdminDashboard() {
   return (
     <div className="space-y-6">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           icon="money"
           label="Total Revenue"
@@ -74,7 +74,7 @@ export default async function AdminDashboard() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Revenue chart */}
-        <Card className="lg:col-span-2 border-gray-100">
+        <Card className="lg:col-span-2 border-gray-100 shadow-sm rounded-3xl bg-white overflow-hidden">
           <CardHeader className="p-5 pb-3">
             <div className="flex items-center justify-between">
               <div>
@@ -97,7 +97,7 @@ export default async function AdminDashboard() {
                   <div key={d.month} className="flex-1 flex flex-col items-center gap-2">
                     <div className="w-full flex flex-col justify-end" style={{ height: "110px" }}>
                       <div
-                        className={`w-full rounded-t-sm transition-all ${isLast ? "bg-primary" : "bg-gray-100"}`}
+                        className={`w-full rounded-t-xl transition-all ${isLast ? "bg-gradient-to-t from-orange-500 to-orange-600 shadow-md shadow-orange-500/10 hover:opacity-90" : "bg-slate-100 hover:bg-slate-200"}`}
                         style={{ height: `${height}%` }}
                         title={formatCurrency(d.revenue)}
                       />
@@ -125,7 +125,7 @@ export default async function AdminDashboard() {
         </Card>
 
         {/* Fleet status */}
-        <Card className="border-gray-100">
+        <Card className="border-gray-100 shadow-sm rounded-3xl bg-white overflow-hidden">
           <CardHeader className="p-5 pb-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-900">Fleet Status</h2>
@@ -224,7 +224,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Full bookings table */}
-      <Card className="border-gray-100">
+      <Card className="border-gray-100 shadow-sm rounded-3xl bg-white overflow-hidden">
         <CardHeader className="p-5 pb-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-900">All Recent Bookings</h2>

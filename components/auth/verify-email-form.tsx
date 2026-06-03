@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { EnvelopeSimple, CheckCircle, XCircle } from "@phosphor-icons/react";
+import { resendVerificationEmail } from "@/lib/actions/auth";
 
 type VerificationStatus = "idle" | "verifying" | "success" | "error";
 
@@ -88,14 +89,11 @@ export function VerifyEmailForm() {
 
     setIsResending(true);
     try {
-      const supabase = createClient();
-      
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: targetEmail,
-      });
+      const { success, error } = await resendVerificationEmail(targetEmail);
 
-      if (error) throw error;
+      if (!success) {
+        throw new Error(error || "Failed to resend confirmation email");
+      }
 
       toast.success("Verification email sent!", {
         description: "Check your inbox for the verification link.",

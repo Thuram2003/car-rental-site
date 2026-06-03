@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/supabase/types";
 
 export interface AuthError {
@@ -87,11 +87,12 @@ export async function signUp(data: {
     }
 
     // Profile is auto-created by the handle_new_user trigger.
-    // Update phone + license_number which the trigger doesn't set.
+    // Update phone + license_number which the trigger doesn't set using adminDb to bypass RLS.
     if (authData.user) {
-      await supabase
+      const adminDb = await createAdminClient();
+      await (adminDb as any)
         .from("profiles")
-        .update({ phone: data.phone, license_number: data.licenseNumber } as never)
+        .update({ phone: data.phone, license_number: data.licenseNumber })
         .eq("id", authData.user.id);
     }
 
@@ -268,5 +269,29 @@ export async function signOutAction(): Promise<{ error: { message: string } | nu
   } catch (error) {
     console.error("Sign out error:", error);
     return { error: { message: "An unexpected error occurred during sign out" } };
+  }
+}
+
+// ─── Resend Verification Email ───────────────────────────────────────────────
+
+export async function resendVerificationEmail(email: string): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/auth/callback`,
+      }
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, error: null };
+  } catch (error: any) {
+    console.error("Resend verification email error:", error);
+    return { success: false, error: error.message || "An unexpected error occurred during resending." };
   }
 }

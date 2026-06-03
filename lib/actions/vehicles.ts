@@ -117,6 +117,25 @@ export async function getAllVehiclesAdmin() {
   return data ?? [];
 }
 
+// ─── Get all vehicles (for reports) ──────────────────────────────────────────
+
+export async function getAllVehicles() {
+  const supabase = await createClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from("vehicles")
+    .select("id, category, daily_rate, status")
+    .eq("is_active", true);
+
+  if (error) {
+    console.error("getAllVehicles error:", error.message);
+    return [];
+  }
+
+  return data ?? [];
+}
+
 // ─── Admin: create vehicle ────────────────────────────────────────────────────
 
 export async function createVehicle(vehicle: {

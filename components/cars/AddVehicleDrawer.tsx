@@ -17,7 +17,7 @@ import { ImageUpload } from "@/components/ui/image-upload";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
-import { createVehicle, getActiveBranches } from "@/lib/actions/vehicles";
+import { createVehicle, updateVehicle, getActiveBranches } from "@/lib/actions/vehicles";
 import { cn } from "@/lib/utils";
 
 // ─── Zod Schema ───────────────────────────────────────────────────────────────
@@ -73,9 +73,10 @@ interface AddVehicleDrawerProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  vehicleToEdit?: any;
 }
 
-export function AddVehicleDrawer({ open, onClose, onSuccess }: AddVehicleDrawerProps) {
+export function AddVehicleDrawer({ open, onClose, onSuccess, vehicleToEdit }: AddVehicleDrawerProps) {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [branches, setBranches] = useState<{ id: string; name: string; city: string }[]>([]);
@@ -106,13 +107,47 @@ export function AddVehicleDrawer({ open, onClose, onSuccess }: AddVehicleDrawerP
   useEffect(() => {
     if (open) {
       setStep(1);
-      form.reset();
+      if (vehicleToEdit) {
+        form.reset({
+          make: vehicleToEdit.make || "",
+          model: vehicleToEdit.model || "",
+          year: vehicleToEdit.year || new Date().getFullYear(),
+          color: vehicleToEdit.color || "",
+          license_plate: vehicleToEdit.license_plate || "",
+          category: vehicleToEdit.category || "Economy",
+          fuel_type: vehicleToEdit.fuel_type || "Petrol",
+          transmission: vehicleToEdit.transmission || "Automatic",
+          seats: vehicleToEdit.seats || 5,
+          daily_rate: vehicleToEdit.daily_rate || 0,
+          description: vehicleToEdit.description || "",
+          branch_id: vehicleToEdit.branch_id || "",
+          image_url: vehicleToEdit.image_url || "",
+          cloudinary_public_id: vehicleToEdit.cloudinary_public_id || "",
+        });
+      } else {
+        form.reset({
+          make: "",
+          model: "",
+          year: new Date().getFullYear(),
+          color: "",
+          license_plate: "",
+          category: "Economy",
+          fuel_type: "Petrol",
+          transmission: "Automatic",
+          seats: 5,
+          daily_rate: 0,
+          description: "",
+          branch_id: "",
+          image_url: "",
+          cloudinary_public_id: "",
+        });
+      }
       // Load branches
       getActiveBranches().then((data) => {
         setBranches(data);
       });
     }
-  }, [open, form]);
+  }, [open, vehicleToEdit, form]);
 
   const handleNext = async () => {
     let fieldsToValidate: (keyof AddVehicleValues)[] = [];
@@ -138,17 +173,31 @@ export function AddVehicleDrawer({ open, onClose, onSuccess }: AddVehicleDrawerP
   const onSubmit = async (values: AddVehicleValues) => {
     setSaving(true);
     try {
-      const result = await createVehicle({
-        ...values,
-        features: [],
-      });
+      if (vehicleToEdit) {
+        const ok = await updateVehicle(vehicleToEdit.id, {
+          ...values,
+          features: [],
+        });
 
-      if (!result) {
-        toast.error("Failed to add vehicle to database. Please try again.");
-        return;
+        if (!ok) {
+          toast.error("Failed to update vehicle in database. Please try again.");
+          return;
+        }
+
+        toast.success(`${values.make} ${values.model} successfully updated!`);
+      } else {
+        const result = await createVehicle({
+          ...values,
+          features: [],
+        });
+
+        if (!result) {
+          toast.error("Failed to add vehicle to database. Please try again.");
+          return;
+        }
+
+        toast.success(`${values.make} ${values.model} successfully added to fleet!`);
       }
-
-      toast.success(`${values.make} ${values.model} successfully added to fleet!`);
       form.reset();
       onSuccess();
     } catch (err) {
@@ -167,10 +216,10 @@ export function AddVehicleDrawer({ open, onClose, onSuccess }: AddVehicleDrawerP
           <div>
             <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <Car className="w-5 h-5 text-primary" />
-              Add New Vehicle
+              {vehicleToEdit ? "Edit Vehicle Details" : "Add New Vehicle"}
             </DialogTitle>
             <DialogDescription className="text-xs text-gray-500 mt-1">
-              Fill in the step-by-step form to add a vehicle to the active fleet.
+              {vehicleToEdit ? "Update specifications and information of the vehicle." : "Fill in the step-by-step form to add a vehicle to the active fleet."}
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -608,7 +657,7 @@ export function AddVehicleDrawer({ open, onClose, onSuccess }: AddVehicleDrawerP
                     ) : (
                       <>
                         <Check className="w-4 h-4" />
-                        Add Vehicle
+                        {vehicleToEdit ? "Save Changes" : "Add Vehicle"}
                       </>
                     )}
                   </Button>
