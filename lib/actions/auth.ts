@@ -20,14 +20,6 @@ export async function signIn(
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      // Check if it's an email verification error
-      if (error.message.includes("Email not confirmed") || error.message.includes("verify")) {
-        return { 
-          error: null, 
-          needsVerification: true,
-          redirectTo: `/verify-email?email=${encodeURIComponent(email)}`
-        };
-      }
       return { error: { message: error.message } };
     }
 
@@ -63,22 +55,18 @@ export async function signUp(data: {
   licenseNumber: string;
 }): Promise<{ error: AuthError | null; needsVerification?: boolean }> {
   try {
-    const supabase = await createClient();
+    // Use admin client to create user WITHOUT email verification
+    const adminClient = await createAdminClient();
 
-    // Get the base URL for email verification redirect
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-      (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
-
-    const { data: authData, error } = await supabase.auth.signUp({
+    // Create user with email already confirmed - no verification needed!
+    const { data: authData, error } = await adminClient.auth.admin.createUser({
       email: data.email,
       password: data.password,
-      options: {
-        data: {
-          full_name: `${data.firstName} ${data.lastName}`,
-          phone: data.phone,
-          license_number: data.licenseNumber,
-        },
-        emailRedirectTo: `${baseUrl}/auth/callback`,
+      email_confirm: true, // ✅ Email is auto-confirmed - can login immediately!
+      user_metadata: {
+        full_name: `${data.firstName} ${data.lastName}`,
+        phone: data.phone,
+        license_number: data.licenseNumber,
       },
     });
 
@@ -87,19 +75,16 @@ export async function signUp(data: {
     }
 
     // Profile is auto-created by the handle_new_user trigger.
-    // Update phone + license_number which the trigger doesn't set using adminDb to bypass RLS.
+    // Update phone + license_number which the trigger doesn't set
     if (authData.user) {
-      const adminDb = await createAdminClient();
-      await (adminDb as any)
+      await (adminClient as any)
         .from("profiles")
         .update({ phone: data.phone, license_number: data.licenseNumber })
         .eq("id", authData.user.id);
     }
 
-    // Check if email confirmation is required
-    const needsVerification = authData.user && !authData.user.email_confirmed_at ? true : false;
-
-    return { error: null, needsVerification };
+    // No email verification needed - users can login immediately
+    return { error: null, needsVerification: false };
   } catch (error) {
     console.error("Sign up error:", error);
     return { error: { message: "An unexpected error occurred during registration" } };
@@ -276,17 +261,34 @@ export async function signOutAction(): Promise<{ error: { message: string } | nu
 
 export async function resendVerificationEmail(email: string): Promise<{ success: boolean; error: string | null }> {
   try {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email,
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/auth/callback`,
-      }
+    // Get user ID from email
+    const adminClient = await createAdminClient();
+    const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers();
+    
+    if (listError) {
+      return { success: false, error: "Failed to find user" };
+    }
+
+    const user = users.find(u => u.email === email);
+    
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    // Send verification email via Resend API (not Supabase)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/send-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        userId: user.id,
+      }),
     });
 
-    if (error) {
-      return { success: false, error: error.message };
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      return { success: false, error: result.error || "Failed to send verification email" };
     }
 
     return { success: true, error: null };

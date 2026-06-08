@@ -93,6 +93,16 @@ export function DocumentVerificationStep({
 
   const handleError = () => {
     const errors = form.formState.errors;
+    
+    // Check specifically for terms agreement error
+    if (errors.agreeTerms) {
+      toast.error("Terms of Service Required", {
+        description: "You must agree to the Terms of Service and Privacy Policy to continue.",
+      });
+      return;
+    }
+    
+    // Show other validation errors
     const errorMessages = Object.values(errors).map(error => error.message).filter(Boolean);
     
     if (errorMessages.length > 0) {

@@ -24,7 +24,7 @@ export function VerifyEmailForm() {
   const type = searchParams.get("type");
 
   useEffect(() => {
-    // 1. Immediately handle Supabase verification error redirects
+    // 1. Immediately handle verification error redirects
     const errorParam = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
     
@@ -39,22 +39,23 @@ export function VerifyEmailForm() {
       return;
     }
 
-    // 2. If we have token_hash and type from Supabase email link, verify it
+    // 2. If we have token and email from Resend email link, verify it
     async function verifyEmail() {
-      if (token && type === "email") {
+      if (token && email) {
         setVerificationStatus("verifying");
         
         try {
-          const supabase = createClient();
-          
-          // Verify the email using Supabase's verifyOtp
-          const { error } = await supabase.auth.verifyOtp({
-            token_hash: token,
-            type: "email",
+          // Call our custom verification API route
+          const response = await fetch('/api/auth/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, email }),
           });
 
-          if (error) {
-            throw error;
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.error || "Verification failed");
           }
 
           setVerificationStatus("success");
@@ -76,7 +77,7 @@ export function VerifyEmailForm() {
     }
 
     verifyEmail();
-  }, [token, type, router, searchParams]);
+  }, [token, email, router, searchParams]);
 
   async function handleResend() {
     const targetEmail = email || inputEmail;
@@ -179,7 +180,7 @@ export function VerifyEmailForm() {
 
         <div className="space-y-4 pt-2">
           <p className="text-sm text-gray-500 text-center leading-relaxed">
-            Supabase link verification failed. This usually means the email verification token has expired (expires in 24 hours), or the link has already been used once.
+            Link verification failed. This usually means the email verification token has expired (expires in 24 hours), or the link has already been used once.
           </p>
 
           {/* Email input field when no email was passed in parameters */}

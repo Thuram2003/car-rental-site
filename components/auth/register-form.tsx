@@ -93,19 +93,11 @@ export function RegisterForm() {
       return;
     }
     
-    if (needsVerification) {
-      toast.success("Account created!", { 
-        description: "Please check your email to verify your account." 
-      });
-      // Redirect to verification page
-      window.location.href = `/verify-email?email=${encodeURIComponent(personalInfoData.email)}`;
-    } else {
-      // Auto-confirmed (shouldn't happen with default Supabase settings)
-      toast.success("Account created!", { 
-        description: "You can now log in." 
-      });
-      window.location.href = "/login";
-    }
+    // Account is ready - login immediately!
+    toast.success("Account created successfully!", { 
+      description: "You can now login to your account." 
+    });
+    window.location.href = "/login";
   };
 
   const handleBack = () => {
