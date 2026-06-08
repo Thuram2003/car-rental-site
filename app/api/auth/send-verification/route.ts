@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('full_name')
       .eq('id', actualUserId)
-      .single();
+      .single() as { data: { full_name: string } | null };
     
     if (profile?.full_name) {
       userName = profile.full_name.split(' ')[0]; // Get first name
