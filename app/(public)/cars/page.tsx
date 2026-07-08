@@ -327,7 +327,7 @@ function CarsPageInner() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
-            {filtered.map((car) => (
+            {filtered.map((car, index) => (
               <Link key={car.id} href={`/cars/${car.id}`} className="group">
                 <Card className="bg-white rounded-3xl overflow-hidden border border-gray-100 hover:shadow-xl hover:border-orange-200 transition-all duration-300 h-full flex flex-col group shadow-sm">
                   {/* Vehicle Image section */}
@@ -337,6 +337,8 @@ function CarsPageInner() {
                       alt={`${car.make} ${car.model}`}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      priority={index < 4}
+                      loading={index < 4 ? "eager" : "lazy"}
                       unoptimized
                     />
                     

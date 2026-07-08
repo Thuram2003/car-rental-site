@@ -115,6 +115,8 @@ export default async function LandingPage() {
                     width={600}
                     height={400}
                     className="w-full h-80 object-cover"
+                    priority
+                    loading="eager"
                     unoptimized
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -185,7 +187,7 @@ export default async function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featured.map((car) => (
+            {featured.map((car, index) => (
               <Link key={car.id} href={`/cars/${car.id}`} className="group">
                 <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md hover:border-orange-200 transition-all duration-200">
                   <div className="relative overflow-hidden h-48">
@@ -194,6 +196,8 @@ export default async function LandingPage() {
                       alt={`${car.make} ${car.model}`}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      priority={index === 0}
+                      loading={index === 0 ? "eager" : "lazy"}
                       unoptimized
                     />
                     <div className="absolute top-3 left-3">
