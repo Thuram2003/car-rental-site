@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
-  Car, List, X, User, SignOut, Gauge, CaretDown,
+  Car, List, X, User, SignOut, Gauge, CaretDown, ClipboardText,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -133,6 +133,12 @@ export function Navbar({ initialProfile = null }: NavbarProps) {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
+                    <Link href="/questionnaires" className="flex items-center gap-2 cursor-pointer">
+                      <ClipboardText className="w-4 h-4" />
+                      Surveys
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/profile" className="flex items-center gap-2 cursor-pointer">
                       <User className="w-4 h-4" />
                       Profile
@@ -211,6 +217,18 @@ export function Navbar({ initialProfile = null }: NavbarProps) {
                     <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">{user.role}</p>
                   </div>
                 </div>
+                <Link href="/bookings" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" size="default" className="w-full justify-start gap-2">
+                    <Car className="w-4 h-4" />
+                    My Bookings
+                  </Button>
+                </Link>
+                <Link href="/questionnaires" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" size="default" className="w-full justify-start gap-2">
+                    <ClipboardText className="w-4 h-4" />
+                    Surveys
+                  </Button>
+                </Link>
                 <Link href="/profile" onClick={() => setMobileOpen(false)}>
                   <Button variant="outline" size="default" className="w-full justify-start gap-2">
                     <User className="w-4 h-4" />
@@ -225,12 +243,6 @@ export function Navbar({ initialProfile = null }: NavbarProps) {
                     </Button>
                   </Link>
                 )}
-                <Link href="/bookings" onClick={() => setMobileOpen(false)}>
-                  <Button variant="outline" size="default" className="w-full justify-start gap-2">
-                    <Car className="w-4 h-4" />
-                    My Bookings
-                  </Button>
-                </Link>
                 <Button
                   variant="destructive"
                   size="default"

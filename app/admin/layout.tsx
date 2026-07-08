@@ -15,6 +15,7 @@ import {
   ChatCircle,
   ShieldCheck,
   Globe,
+  ClipboardText,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: "/admin/bookings", icon: CalendarBlank, label: "Bookings" },
   { href: "/admin/customers", icon: Users, label: "Customers" },
   { href: "/admin/staff", icon: ShieldCheck, label: "Staff Team" },
+  { href: "/admin/questionnaires", icon: ClipboardText, label: "Surveys" },
   { href: "/admin/reports", icon: ChartBar, label: "Reports" },
   { href: "/admin/messages", icon: ChatCircle, label: "Messages" },
   { href: "/admin/settings", icon: Gear, label: "Settings" },
